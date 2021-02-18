@@ -1,0 +1,462 @@
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+    <style>
+        #progressbar1
+        {
+            margin: 5px;
+            width: 0%;
+            height: 10px;
+            background-color: blue;
+        }
+    </style>
+    <script src="https://code.jquery.com/jquery-2.2.4.min.js"></script>
+    <script>
+        var user = "";
+        var password = "";
+
+        var projectid = 0;
+        var parentid = 0;
+        var speckey = "";
+        var server = "";
+
+        var createFolderCallback = function(){console.log("TBD");};
+        var createSpecificationCallback = function(){console.log("TBD");};
+        var createTextCallback = function(){console.log("TBD");};
+
+        var specificationCreatedCallback = function(id){};
+
+        var numItems = 0;
+        var numItemsUploaded = 0;
+
+        var cachedImages = new Map();
+
+        var _counter = 0;
+
+        $(document).ready(function()
+        {
+            test();
+        });
+
+        var _autoid = 0;
+
+        function autoid()
+        {
+            _autoid++;
+            return _autoid;
+        }
+
+        function test()
+        {
+            $("#content").hide();
+            
+            $.ajax({
+                type: "GET",
+                url: "specs.htm",
+                timeout: 20000,
+                success: function(data)
+                {
+                    var content = $("#content").html(data);
+                    var parsed = $("#parsed").html("");
+                 
+                    createFolderCallback =  function(projectid, parentid, name, description, padding, onsuccess)
+                                            {
+                                                var id = autoid();
+                                                console.log(padding + name.replace(/[\n\r]+/g, '').replace(/\s+/g, ' ') + " folder " + id + " in " + parentid);
+                                                ++numItems;
+                                                onsuccess(id);
+                                            };
+                    createSpecificationCallback = function(projectid, parentid, name, description, padding, onsuccess)
+                                            {
+                                                var id = autoid();
+                                                console.log(padding + name + " in " + parentid);
+                                                ++numItems;
+                                                onsuccess(id);
+                                            };
+                    createTextCallback = function(projectid, parentid, name, description, padding, onsuccess)
+                                            {
+                                                var id = autoid();
+                                                console.log(padding + "Create Text " + name.substring(0, 10) + " in " + parentid);
+                                                ++numItems;
+                                                onsuccess(id);
+                                            };
+
+                    iterate();
+                    
+                    $('#progressbarInfo').html(numItemsUploaded + "/" + numItems);
+                    
+                    $("#save").show();
+                    
+                    $("#save").click(function()
+                    {
+                        $(this).prop("disabled", true);
+                        upload();
+                        $(this).prop("disabled", false);
+                    });
+                }
+            });
+        }
+
+        function setCredentials()
+        {
+            server = $("#server").val();
+            user = $("#user").val();
+            password = $("#password").val();
+
+            projectid = $("#projectid").val();
+            parentid = $("#parentid").val();
+            speckey = $("#speckey").val();
+        }
+
+        function upload()
+        {
+            _counter = 0;
+
+            $("#correspondence").show();
+
+            setCredentials();
+
+            specificationCreatedCallback = function(id)
+            {
+                $.ajax({
+                    type: "GET",
+                    dataType: 'json',
+                    headers: { "Accept": "application/json"},
+                    contentType: 'application/json',
+                    url: server + "/rest/latest/items/" + id,
+                    beforeSend: function(xhr) { 
+                        xhr.setRequestHeader("Authorization", "Basic " + btoa(user + ":" + password)); 
+                    },
+                    success: function (json)
+                    {
+                        addSpecificationTable(json.data.fields.name, json.data.documentKey, json.data.globalId);
+                    },
+                    error: function (jqxhr, textStatus, error)
+                    {
+                        $("#result").append("------------------<br>" + 
+                                            "<b>Name:</b> " + name + "<br><b>Description:</b> " + description +
+                                            "<br>" + (jqxhr.responseText) + "<br>" + 
+                                            "------------------<br>");
+                        console.error(jqxhr);
+                    }
+                }); 
+                
+            };
+
+            $.ajax({
+                type: "GET",
+                url: "specs.htm",
+                timeout: 20000,
+                success: function(data)
+                {
+                    var content = $("#content").html(data);
+                    var parsed = $("#parsed").html("");
+                 
+                    createFolderCallback =  function(projectid, parentid, name, description, padding, onsuccess)
+                                            {
+                                                createElement(projectid, parentid, 32, name, description, 42, onsuccess);
+                                            };
+                    createSpecificationCallback = function(projectid, parentid, name, description, padding, onsuccess)
+                                            {
+                                                createElement(projectid, parentid, 42, name, description, 42, onsuccess);
+                                            };
+                    createTextCallback = function(projectid, parentid, name, description, padding, onsuccess)
+                                            {
+                                                createElement(projectid, parentid, 33, name, description, 33, onsuccess);
+                                            };
+
+                    iterate();
+                    
+                    content.hide();
+                }
+            });
+        }
+
+        function cleanTables(element)
+        {
+            element.find('table').each(function()
+            {
+                var self = $(this);
+                
+                var content = self.html();
+                
+                $("tbody", {html: content}).appendTo(self);
+            });
+        }
+
+        function burnImages(element)
+        {
+            element.find('img').each(function()
+            {
+                var self = $(this);
+                
+                if(cachedImages.has(self.attr("src")))
+                {
+                    self.attr("src", cachedImages.get(self.attr("src")));
+                }
+                else
+                {
+                    getDataUri($(this).attr("src"), function(data)
+                    {
+                        cachedImages.set(self.attr("src"), data);
+                        
+                        self.attr("src", data);
+                    })
+                }
+            });
+        }
+
+        function iterate()
+        {
+            $('h1,h2,h3,h4,h5,h6').addClass('headingSLT');
+            
+            var parents = new Array();
+            
+            parents[0] = parentid;
+
+            recurse($('.headingSLT').first(), parents);
+        }
+
+        function recurse(header, parents)
+        {
+            if(header.length > 0)
+            {
+                var depth = parseInt(header.prop("tagName").substring(1));
+
+                var padding = new Array(depth).join(" ");
+
+                createFolder(projectid, parents[depth - 1], header, padding, function(newid)
+                {
+                    if(newid > 0)
+                    {        
+                        var container = $("<div/>", {});
+
+                        header.nextAll().each(function(index)
+                        {
+                            if($(this).hasClass("headingSLT"))
+                            {
+                                return false;
+                            }
+                            else
+                            {
+                                $(this).appendTo(container);
+                            }
+                        });
+                
+                        parents[depth] = newid;
+                            
+                        var previousSpec = $("<div/>");
+                        var previousText = $("<div/>");
+                        
+                        container.children().each(function(index)
+                        {
+                            if($(this).text().substr(0, speckey.length) == speckey)
+                            {
+                                if(previousText.text() != "")
+                                {
+                                    createText(projectid, newid, previousText, padding, function(){});
+                                    previousText = $("<div/>");
+                                }
+                                
+                                if(previousSpec.text() != "")
+                                {
+                                    createSpecification(projectid, newid, previousSpec, padding, specificationCreatedCallback);
+                                    previousSpec = $("<div/>");
+                                }
+                                
+                                $(this).appendTo(previousSpec);
+                            }
+                            else
+                            {
+                                if(previousSpec.text() != "")
+                                {
+                                    $(this).appendTo(previousSpec);
+                                }
+                                else
+                                {
+                                    $(this).appendTo(previousText);
+                                }
+                            }
+                        });
+                        
+                        if(previousText.text() != "")
+                        {
+                            createText(projectid, newid, previousText, padding, function(){});
+                        }
+                        
+                        if(previousSpec.text() != "")
+                        {
+                            createSpecification(projectid, newid, previousSpec, padding, specificationCreatedCallback);
+                        }
+                        
+                        // _counter++;
+                        // if(_counter > 8)
+                        // return false;
+                        recurse(header.next(), parents);
+                    }
+                });
+            }
+        }
+
+        function computeStyle(element)
+        {
+            //disabled because not needed for specs
+            
+            // element.find("*").each(function()
+            // {
+                // $(this).attr("style", $(this).attr("style") + ";" + window.getComputedStyle($(this)[0], "").cssText);
+            // });
+        }
+
+        function createFolder(projectid, parentid, element, padding, onsuccess)
+        {
+            var newElement = element.clone();
+            
+            var name = newElement.text();
+            var description = newElement.html();
+            
+            name = name.replace(/(?:\r\n|\r|\n)/g, '').replace(/\s+/g, ' ');
+            description = description.replace(/\\/g, "\\\\").replace(/(?:\r\n|\r|\n)/g, '').replace(/(?:\")/g, '\\"');
+            
+            newElement.appendTo($("#parsed"));
+            
+            createFolderCallback(projectid, parentid, name, description, padding, onsuccess);
+        }
+
+        function createSpecification(projectid, parentid, element, padding, onsuccess)
+        {
+            var newElement = element.clone();
+            
+            computeStyle(newElement);
+            burnImages(newElement);
+            
+            var name = newElement.text();
+            var description = newElement.html();
+            
+            name = name.substring(0, name.indexOf(":"));
+            description = description.substring(description.indexOf(":") + 1);
+            
+            name = name.replace(/(?:\r\n|\r|\n)/g, '').replace(/\s+/g, ' ');
+            description = description.replace(/\\/g, "\\\\").replace(/(?:\r\n|\r|\n)/g, '').replace(/(?:\")/g, '\\"');
+            
+            newElement.appendTo($("#parsed"));
+
+            createSpecificationCallback(projectid, parentid, name, description, padding, onsuccess);
+        }
+
+        function createText(projectid, parentid, element, padding, onsuccess)
+        {
+            var newElement = element.clone();
+            
+            computeStyle(newElement);
+            burnImages(newElement);
+            
+            var name = newElement.text();
+            var description = newElement.html();
+            
+            name = name.replace(/(?:\r\n|\r|\n)/g, '').replace(/\s+/g, ' ').replace(/\s/g, '');
+            description = description.replace(/\\/g, "\\\\").replace(/(?:\r\n|\r|\n)/g, '').replace(/(?:\")/g, '\\"');
+            
+            if(name != "")
+            {
+                newElement.appendTo($("#parsed"));
+                createTextCallback(projectid, parentid, "Description", description, padding, onsuccess);
+            }
+        }
+
+        function createElement(projectid, parentid, type, name, description, childItemType, onsuccess)
+        {
+            var newid = 0;
+            
+            $.ajax({
+                type: "POST",
+                dataType: 'json',
+                headers: { "Accept": "application/json"},
+                data: "{\"project\": " + projectid + ", \"itemType\": " + type + 
+                        ", \"childItemType\": " + childItemType + 
+                        ", \"location\": {\"parent\": { \"item\": " + parentid + 
+                        "}}, \"fields\": {\"name\": \"" + 
+                        name + 
+                        "\", \"description\": \"" + 
+                        description + 
+                        "\"}}",
+                contentType: 'application/json',
+                url: server + "/rest/latest/items",
+                beforeSend: function(xhr) { 
+                    xhr.setRequestHeader("Authorization", "Basic " + btoa(user + ":" + password)); 
+                },
+                success: function (json)
+                {
+                    ++numItemsUploaded;
+            
+                    $('#progressbar1').css("width", (numItemsUploaded / numItems) * 100 + "%");
+                    $('#progressbarInfo').html(numItemsUploaded + "/" + numItems);
+                    
+                    onsuccess(json.meta.location.substring(json.meta.location.lastIndexOf("/") + 1));
+                },
+                error: function (jqxhr, textStatus, error)
+                {
+                    $("#result").append("------------------<br>" + 
+                                        "<b>Name:</b> " + name + "<br><b>Description:</b> " + description +
+                                        "<br>" + (jqxhr.responseText) + "<br>" + 
+                                        "------------------<br>");
+                    console.error(jqxhr);
+                }
+            }); 
+        }
+
+        function getDataUri(url, callback, onerror) 
+        {
+            var image = new Image();
+
+            image.onload = function () 
+            {
+                var canvas = document.createElement('canvas');
+                canvas.width = this.naturalWidth; // or 'width' if you want a special/scaled size
+                canvas.height = this.naturalHeight; // or 'height' if you want a special/scaled size
+
+                canvas.getContext('2d').drawImage(this, 0, 0);
+
+                callback(canvas.toDataURL('image/png'));
+            };
+            
+            image.onerror = function (e) 
+            {
+                onerror(e);
+            };
+
+            image.src = url;
+        }
+
+        function addSpecificationTable(name, key, gid)
+        {
+            var tr = $("<tr/>", {html: ""});
+            
+            $("<td/>", {html: name}).appendTo(tr);
+            $("<td/>", {html: key}).appendTo(tr);
+            $("<td/>", {html: gid}).appendTo(tr);
+            
+            tr.appendTo($("#specificationTable"));
+        }
+    </script>
+    </head>
+    <body>
+        <input id="server" type="text" placeholder="Server"></input>
+        <input id="user" type="text" placeholder="User name"></input>
+        <input id="password" type="password" placeholder="*****"></input>
+        
+        <p><input id="projectid" type="text" placeholder="Project ID"></input></p>
+        <p><input id="parentid" type="text" placeholder="Parent ID"></input></p>
+        <p><input id="speckey" type="text" placeholder="Specification Key"></input></p>
+        <input id="save" type="button" value="Upload to JAMA" style="display: none;"></input>
+        
+        <div id="progressbar1"></div>
+        <div id="progressbarInfo"></div>
+        <br>
+        <div id="result"></div>
+        <div id="correspondence" style="display:none;">
+            <table id="specificationTable" border=1><tr><th colspan="3">JAMA Correspondence Table</th></tr><tr><th>Name</th><th>Key</th><th>Global ID</th></tr></table>
+        </div>
+        <div id="content"></div>
+        <div id="parsed"></div>
+    </body>
+</html>
