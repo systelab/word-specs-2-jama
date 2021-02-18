@@ -1,5 +1,4 @@
-# word-specs-2-jama
-Miniscript to upload specifications documents from word to Jama
+This script uploads traditional specifications documents from an exported Microsoft Word document to Jama.
 
 # What it does
 * Recreates same hierarchy as defined in Microsoft Word
