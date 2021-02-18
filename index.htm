@@ -34,7 +34,10 @@
 
         $(document).ready(function()
         {
-            test();
+            $("#test").click(function()
+            {
+                test();
+            });
         });
 
         var _autoid = 0;
@@ -47,6 +50,8 @@
 
         function test()
         {
+            setCredentials();
+            
             $("#content").hide();
             
             $.ajax({
@@ -56,7 +61,11 @@
                 success: function(data)
                 {
                     var content = $("#content").html(data);
-                    var parsed = $("#parsed").html("");
+                    
+                    $("#parsed").html("");
+                 
+                    numItems = 0;
+                    numItemsUploaded = 0;
                  
                     createFolderCallback =  function(projectid, parentid, name, description, padding, onsuccess)
                                             {
@@ -67,16 +76,27 @@
                                             };
                     createSpecificationCallback = function(projectid, parentid, name, description, padding, onsuccess)
                                             {
-                                                var id = autoid();
-                                                console.log(padding + name + " in " + parentid);
-                                                ++numItems;
-                                                onsuccess(id);
+                                                name = name.replace(/(?:\r\n|\r|\n)/g, '').replace(/\s+/g, ' ');
+                                                
+                                                if(name != "")
+                                                {
+                                                    var id = autoid();
+                                                    console.log(padding + name + " in " + parentid);
+                                                    ++numItems;
+                                                    onsuccess(id);
+                                                }
                                             };
                     createTextCallback = function(projectid, parentid, name, description, padding, onsuccess)
                                             {
-                                                var id = autoid();
-                                                console.log(padding + "Create Text " + name.substring(0, 10) + " in " + parentid);
-                                                ++numItems;
+                                                name = name.replace(/(?:\r\n|\r|\n)/g, '').replace(/\s+/g, ' ').replace(/\s/g, '');
+                                                
+                                                if(name != "")
+                                                {
+                                                    var id = autoid();
+                                                    console.log(padding + "Create Text " + name.substring(0, 10) + " in " + parentid);
+                                                    ++numItems;
+                                                }
+                                                
                                                 onsuccess(id);
                                             };
 
@@ -84,7 +104,7 @@
                     
                     $('#progressbarInfo').html(numItemsUploaded + "/" + numItems);
                     
-                    $("#save").show();
+                    $("#uploadContent").show();
                     
                     $("#save").click(function()
                     {
@@ -112,8 +132,6 @@
             _counter = 0;
 
             $("#correspondence").show();
-
-            setCredentials();
 
             specificationCreatedCallback = function(id)
             {
@@ -338,9 +356,12 @@
             name = name.replace(/(?:\r\n|\r|\n)/g, '').replace(/\s+/g, ' ');
             description = description.replace(/\\/g, "\\\\").replace(/(?:\r\n|\r|\n)/g, '').replace(/(?:\")/g, '\\"');
             
-            newElement.appendTo($("#parsed"));
+            if(name != "")
+            {
+                newElement.appendTo($("#parsed"));
 
-            createSpecificationCallback(projectid, parentid, name, description, padding, onsuccess);
+                createSpecificationCallback(projectid, parentid, name, description, padding, onsuccess);
+            }
         }
 
         function createText(projectid, parentid, element, padding, onsuccess)
@@ -440,20 +461,27 @@
     </script>
     </head>
     <body>
-        <input id="server" type="text" placeholder="Server"></input>
-        <input id="user" type="text" placeholder="User name"></input>
-        <input id="password" type="password" placeholder="*****"></input>
+        <div>
+            <p><input id="speckey" type="text" placeholder="Specification Key"></input></p>
+            <input id="test" type="button" value="Parse"></input>
+        </div>
+        <hr>
+        <div id="uploadContent" style="display: none;">
+            <input id="server" type="text" placeholder="Server"></input>
+            <input id="user" type="text" placeholder="User name"></input>
+            <input id="password" type="password" placeholder="*****"></input>
+            
+            <p><input id="projectid" type="text" placeholder="Project ID"></input></p>
+            <p><input id="parentid" type="text" placeholder="Parent ID"></input></p>
         
-        <p><input id="projectid" type="text" placeholder="Project ID"></input></p>
-        <p><input id="parentid" type="text" placeholder="Parent ID"></input></p>
-        <p><input id="speckey" type="text" placeholder="Specification Key"></input></p>
-        <input id="save" type="button" value="Upload to JAMA" style="display: none;"></input>
-        
+            <input id="save" type="button" value="Upload to JAMA"></input>
+        </div>
         <div id="progressbar1"></div>
         <div id="progressbarInfo"></div>
         <br>
         <div id="result"></div>
         <div id="correspondence" style="display:none;">
+            <hr>
             <table id="specificationTable" border=1><tr><th colspan="3">JAMA Correspondence Table</th></tr><tr><th>Name</th><th>Key</th><th>Global ID</th></tr></table>
         </div>
         <div id="content"></div>
